@@ -27,10 +27,10 @@
       text-align: left; 
       background: #f0f0f0; 
       padding: 15px; 
-      white-space: pre-wrap; 
       border-radius: 8px;
       margin-top: 20px;
       min-height: 100px;
+      word-wrap: break-word;
     }
     #status { font-weight: bold; margin: 15px 0; color: #333; }
   </style>
@@ -78,7 +78,7 @@
             const base64Data = reader.result;
             
             // ========================================================
-            // ★ここにステップ1で取得したGASのウェブアプリURLを貼り付けます★
+            // ★ここにGASのウェブアプリURLを貼り付けます★
             // ========================================================
             const gasUrl = "https://script.google.com/macros/s/AKfycbxMvxUNqrCf-7DIEBEByh_vpB6HjHwVsj0PzN09nrJ0vmBbhm0ub9qV-ZriRJv2kUPe/exec"; 
             
@@ -96,8 +96,22 @@
             .then(response => response.json())
             .then(data => {
               if (data.success) {
-                document.getElementById('status').innerText = "完了！スプレッドシートに保存しました。";
-                document.getElementById('result').innerText = data.text;
+                document.getElementById('status').innerText = "完了！ドキュメントが作成されました。";
+                
+                // 改行をHTMLタグに変換して表示
+                const formattedText = data.text.replace(/\n/g, '<br>');
+                
+                // ドキュメントを開くための青いボタンリンクを作成
+                const docLinkHtml = `
+                  <div style="margin-top: 20px; text-align: center;">
+                    <a href="${data.docUrl}" target="_blank" style="display: inline-block; padding: 12px 24px; background-color: #1a73e8; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                      📄 Googleドキュメントを開く
+                    </a>
+                  </div>
+                `;
+                
+                // 結果エリアに文字起こしテキストとボタンを表示
+                document.getElementById('result').innerHTML = formattedText + docLinkHtml;
               } else {
                 document.getElementById('status').innerText = "GAS側エラー: " + data.error;
               }
