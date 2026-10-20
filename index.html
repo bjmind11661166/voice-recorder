@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>文字起こしレコーダー</title>
+  <style>
+    body { 
+      font-family: sans-serif; 
+      padding: 20px; 
+      text-align: center; 
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    button { 
+      padding: 15px 30px; 
+      font-size: 18px; 
+      margin: 10px; 
+      border-radius: 8px; 
+      cursor: pointer;
+    }
+    #startBtn { background-color: #ff4444; color: white; border: none; }
+    #startBtn:disabled { background-color: #ffaaaa; cursor: not-allowed; }
+    #stopBtn { background-color: #444444; color: white; border: none; }
+    #stopBtn:disabled { background-color: #aaaaaa; cursor: not-allowed; }
+    #result { 
+      text-align: left; 
+      background: #f0f0f0; 
+      padding: 15px; 
+      white-space: pre-wrap; 
+      border-radius: 8px;
+      margin-top: 20px;
+      min-height: 100px;
+    }
+    #status { font-weight: bold; margin: 15px 0; color: #333; }
+  </style>
+</head>
+<body>
+  <h2>🎙️ 音声アシスタント</h2>
+  <button id="startBtn">録音開始</button>
+  <button id="stopBtn" disabled>録音停止</button>
+  <p id="status">待機中...</p>
+  <div id="result">ここに文字起こし結果が表示されます</div>
+
+  <script>
+    let mediaRecorder;
+    let audioChunks = [];
+    let mimeType = 'audio/webm'; // デフォルト
+
+    document.getElementById('startBtn').addEventListener('click', async () => {
+      try {
+        // マイクのアクセス許可をリクエスト
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // ブラウザ（特にiOS）に対応したMIMEタイプを選択
+        if (MediaRecorder.isTypeSupported('audio/webm')) {
+            mimeType = 'audio/webm';
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+            mimeType = 'audio/mp4'; // iOS Safari向け
+        } else {
+            mimeType = ''; // ブラウザのデフォルトに任せる
+        }
+
+        mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = e => {
+            if (e.data.size > 0) audioChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          document.getElementById('status').innerText = "Gemini 2.5で解析中...（数秒〜数十秒かかります）";
+          const audioBlob = new Blob(audioChunks, { type: mimeType || 'audio/mp4' });
+          
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          reader.onloadend = () => {
+            const base64Data = reader.result;
+            
+            // ========================================================
+            // ★ここにステップ1で取得したGASのウェブアプリURLを貼り付けます★
+            // ========================================================
+            const gasUrl = "https://script.google.com/macros/s/XXXXX/exec"; 
+            
+            const payload = { 
+              base64Data: base64Data, 
+              mimeType: mimeType || 'audio/mp4' 
+            };
+
+            // fetchを使ってGASにデータを送信する
+            fetch(gasUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain' }, // CORS回避のため text/plain
+              body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+              if (data.success) {
+                document.getElementById('status').innerText = "完了！スプレッドシートに保存しました。";
+                document.getElementById('result').innerText = data.text;
+              } else {
+                document.getElementById('status').innerText = "GAS側エラー: " + data.error;
+              }
+            })
+            .catch(err => {
+              document.getElementById('status').innerText = "通信エラー: " + err.message;
+            });
+          };
+        };
+
+        mediaRecorder.start();
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = false;
+        document.getElementById('status').innerText = "🔴 録音中...";
+
+      } catch (err) {
+        // マイクブロック時のエラー詳細を表示
+        alert("マイク接続エラー\n" + err.name + ": " + err.message);
+        document.getElementById('status').innerText = "エラー: " + err.name;
+      }
+    });
+
+    document.getElementById('stopBtn').addEventListener('click', () => {
+      if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+        // マイクのストリームを完全に閉じる（スマホで赤い録音マークを消すため）
+        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+      }
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+    });
+  </script>
+</body>
+</html>
