@@ -69,7 +69,7 @@
         };
 
         mediaRecorder.onstop = () => {
-          document.getElementById('status').innerText = "Gemini 2.5で解析中...（数秒〜数十秒かかります）";
+         document.getElementById('status').innerText = "Gemini 2.5で要約と文字起こしを作成中...（数十秒かかります）";
           const audioBlob = new Blob(audioChunks, { type: mimeType || 'audio/mp4' });
           
           const reader = new FileReader();
