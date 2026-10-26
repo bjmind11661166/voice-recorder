@@ -61,7 +61,11 @@
             mimeType = ''; // ブラウザのデフォルトに任せる
         }
 
-        mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+        // ★追加: audioBitsPerSecondを指定し、長時間の録音に対応
+        mediaRecorder = new MediaRecorder(stream, { 
+            mimeType: mimeType,
+            audioBitsPerSecond: 16000 // 16kbpsに制限
+        });
         audioChunks = [];
 
         mediaRecorder.ondataavailable = e => {
@@ -96,16 +100,16 @@
             .then(response => response.json())
             .then(data => {
               if (data.success) {
-                document.getElementById('status').innerText = "完了！ドキュメントが作成されました。";
+                document.getElementById('status').innerText = "完了！ドキュメント作成の受付が完了しました。";
                 
                 // 改行をHTMLタグに変換して表示
                 const formattedText = data.text.replace(/\n/g, '<br>');
                 
-                // ドキュメントを開くための青いボタンリンクを作成
+                // ドキュメントを開くための青いボタンリンクを作成（※URL未定時はGoogleドライブを開くよう調整）
                 const docLinkHtml = `
                   <div style="margin-top: 20px; text-align: center;">
-                    <a href="${data.docUrl}" target="_blank" style="display: inline-block; padding: 12px 24px; background-color: #1a73e8; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
-                      📄 Googleドキュメントを開く
+                    <a href="${data.docUrl || 'https://drive.google.com/drive/my-drive'}" target="_blank" style="display: inline-block; padding: 12px 24px; background-color: #1a73e8; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                      📄 Googleドライブを開いて確認する
                     </a>
                   </div>
                 `;
