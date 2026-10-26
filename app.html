@@ -33,6 +33,9 @@
       word-wrap: break-word;
     }
     #status { font-weight: bold; margin: 15px 0; color: #333; }
+    .btn-container { margin-bottom: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .doc-btn { padding: 10px 20px; background-color: #1a73e8; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; }
+    .pdf-btn { padding: 10px 20px; background-color: #ea4335; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -40,25 +43,23 @@
   <button id="startBtn">録音開始</button>
   <button id="stopBtn" disabled>録音停止</button>
   <p id="status">待機中...</p>
-  <div id="result">ここに文字起こし結果が表示されます</div>
+  <div id="result">ここに文字起こしと要約結果が表示されます</div>
 
   <script>
     let mediaRecorder;
     let audioChunks = [];
-    let mimeType = 'audio/webm'; // デフォルト
+    let mimeType = 'audio/webm'; 
 
     document.getElementById('startBtn').addEventListener('click', async () => {
       try {
-        // マイクのアクセス許可をリクエスト
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         
-        // ブラウザ（特にiOS）に対応したMIMEタイプを選択
         if (MediaRecorder.isTypeSupported('audio/webm')) {
             mimeType = 'audio/webm';
         } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-            mimeType = 'audio/mp4'; // iOS Safari向け
+            mimeType = 'audio/mp4'; 
         } else {
-            mimeType = ''; // ブラウザのデフォルトに任せる
+            mimeType = ''; 
         }
 
         mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
@@ -69,7 +70,7 @@
         };
 
         mediaRecorder.onstop = () => {
-         document.getElementById('status').innerText = "Gemini 2.5で要約と文字起こしを作成中...（数十秒かかります）";
+         document.getElementById('status').innerText = "⏳ 解析中...（画面を閉じずにお待ちください）";
           const audioBlob = new Blob(audioChunks, { type: mimeType || 'audio/mp4' });
           
           const reader = new FileReader();
@@ -78,7 +79,7 @@
             const base64Data = reader.result;
             
             // ========================================================
-            // ★ここにGASのウェブアプリURLを貼り付けます★
+            // ★新しく発行したGASのウェブアプリURLを貼り付けてください★
             // ========================================================
             const gasUrl = "https://script.google.com/macros/s/AKfycbyi6zq9LrstzjDYwkOMHpZoopXDdZMAPOhKtHruIKtt5P5nHgd02yvgJpLyPBPbvOoX/exec"; 
             
@@ -87,31 +88,27 @@
               mimeType: mimeType || 'audio/mp4' 
             };
 
-            // fetchを使ってGASにデータを送信する
             fetch(gasUrl, {
               method: 'POST',
-              headers: { 'Content-Type': 'text/plain' }, // CORS回避のため text/plain
+              headers: { 'Content-Type': 'text/plain' }, 
               body: JSON.stringify(payload)
             })
             .then(response => response.json())
             .then(data => {
               if (data.success) {
-                document.getElementById('status').innerText = "完了！ドキュメントが作成されました。";
+                document.getElementById('status').innerText = "✅ 解析完了！ドキュメントとPDFを作成しました。";
                 
-                // 改行をHTMLタグに変換して表示
                 const formattedText = data.text.replace(/\n/g, '<br>');
                 
-                // ドキュメントを開くための青いボタンリンクを作成
-                const docLinkHtml = `
-                  <div style="margin-top: 20px; text-align: center;">
-                    <a href="${data.docUrl}" target="_blank" style="display: inline-block; padding: 12px 24px; background-color: #1a73e8; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
-                      📄 Googleドキュメントを開く
-                    </a>
+                const buttonsHtml = `
+                  <div class="btn-container">
+                    <a href="${data.docUrl}" target="_blank" class="doc-btn">📄 ドキュメントを開く</a>
+                    <a href="${data.pdfUrl}" target="_blank" class="pdf-btn">📕 PDFを開く</a>
                   </div>
+                  <hr>
                 `;
                 
-                // 結果エリアに文字起こしテキストとボタンを表示
-                document.getElementById('result').innerHTML = formattedText + docLinkHtml;
+                document.getElementById('result').innerHTML = buttonsHtml + formattedText;
               } else {
                 document.getElementById('status').innerText = "GAS側エラー: " + data.error;
               }
@@ -128,7 +125,6 @@
         document.getElementById('status').innerText = "🔴 録音中...";
 
       } catch (err) {
-        // マイクブロック時のエラー詳細を表示
         alert("マイク接続エラー\n" + err.name + ": " + err.message);
         document.getElementById('status').innerText = "エラー: " + err.name;
       }
@@ -137,7 +133,6 @@
     document.getElementById('stopBtn').addEventListener('click', () => {
       if (mediaRecorder && mediaRecorder.state !== "inactive") {
         mediaRecorder.stop();
-        // マイクのストリームを完全に閉じる（スマホで赤い録音マークを消すため）
         mediaRecorder.stream.getTracks().forEach(track => track.stop());
       }
       document.getElementById('startBtn').disabled = false;
