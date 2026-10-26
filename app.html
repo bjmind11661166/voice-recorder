@@ -12,6 +12,13 @@
       max-width: 600px;
       margin: 0 auto;
     }
+    .mode-selector {
+      background: #e8f0fe;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      font-weight: bold;
+    }
     button { 
       padding: 15px 30px; 
       font-size: 18px; 
@@ -40,10 +47,21 @@
 </head>
 <body>
   <h2>🎙️ 音声アシスタント</h2>
+
+  <!-- モード選択エリア -->
+  <div class="mode-selector">
+    <label style="margin-right: 15px; cursor: pointer;">
+      <input type="radio" name="mode" value="short" checked> ⚡ 短時間モード（画面に結果表示＋PDF）
+    </label>
+    <label style="cursor: pointer;">
+      <input type="radio" name="mode" value="long"> 🕒 長時間モード（裏側で処理＆ドキュメント自動作成）
+    </label>
+  </div>
+
   <button id="startBtn">録音開始</button>
   <button id="stopBtn" disabled>録音停止</button>
   <p id="status">待機中...</p>
-  <div id="result">ここに文字起こしと要約結果が表示されます</div>
+  <div id="result">ここに結果が表示されます</div>
 
   <script>
     let mediaRecorder;
@@ -70,7 +88,14 @@
         };
 
         mediaRecorder.onstop = () => {
-         document.getElementById('status').innerText = "⏳ 解析中...（画面を閉じずにお待ちください）";
+          const selectedMode = document.querySelector('input[name="mode"]:checked').value;
+          
+          if (selectedMode === 'short') {
+            document.getElementById('status').innerText = "⏳ 解析中...（画面を閉じずにお待ちください）";
+          } else {
+            document.getElementById('status').innerText = "⏳ 音声データを送信中...";
+          }
+
           const audioBlob = new Blob(audioChunks, { type: mimeType || 'audio/mp4' });
           
           const reader = new FileReader();
@@ -78,14 +103,13 @@
           reader.onloadend = () => {
             const base64Data = reader.result;
             
-            // ========================================================
-            // ★新しく発行したGASのウェブアプリURLを貼り付けてください★
-            // ========================================================
+            // ★GASのウェブアプリURLをここに設定してください★
             const gasUrl = "https://script.google.com/macros/s/AKfycbyi6zq9LrstzjDYwkOMHpZoopXDdZMAPOhKtHruIKtt5P5nHgd02yvgJpLyPBPbvOoX/exec"; 
             
             const payload = { 
               base64Data: base64Data, 
-              mimeType: mimeType || 'audio/mp4' 
+              mimeType: mimeType || 'audio/mp4',
+              mode: selectedMode // 選択されたモードをGASに送る
             };
 
             fetch(gasUrl, {
@@ -96,19 +120,23 @@
             .then(response => response.json())
             .then(data => {
               if (data.success) {
-                document.getElementById('status').innerText = "✅ 解析完了！ドキュメントとPDFを作成しました。";
-                
-                const formattedText = data.text.replace(/\n/g, '<br>');
-                
-                const buttonsHtml = `
-                  <div class="btn-container">
-                    <a href="${data.docUrl}" target="_blank" class="doc-btn">📄 ドキュメントを開く</a>
-                    <a href="${data.pdfUrl}" target="_blank" class="pdf-btn">📕 PDFを開く</a>
-                  </div>
-                  <hr>
-                `;
-                
-                document.getElementById('result').innerHTML = buttonsHtml + formattedText;
+                if (selectedMode === 'short') {
+                  document.getElementById('status').innerText = "✅ 解析完了！ドキュメントとPDFを作成しました。";
+                  const formattedText = data.text.replace(/\n/g, '<br>');
+                  const buttonsHtml = `
+                    <div class="btn-container">
+                      <a href="${data.docUrl}" target="_blank" class="doc-btn">📄 ドキュメントを開く</a>
+                      <a href="${data.pdfUrl}" target="_blank" class="pdf-btn">📕 PDFを開く</a>
+                    </div>
+                    <hr>
+                  `;
+                  document.getElementById('result').innerHTML = buttonsHtml + formattedText;
+                } else {
+                  document.getElementById('status').innerText = "✅ 受付完了！";
+                  document.getElementById('result').innerHTML = `
+                    <p><strong>${data.text.replace(/\n/g, '<br>')}</strong></p>
+                  `;
+                }
               } else {
                 document.getElementById('status').innerText = "GAS側エラー: " + data.error;
               }
