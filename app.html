@@ -67,6 +67,44 @@
     let mediaRecorder;
     let audioChunks = [];
     let mimeType = 'audio/webm'; 
+    const gasUrl = "https://script.google.com/macros/s/AKfycbyi6zq9LrstzjDYwkOMHpZoopXDdZMAPOhKtHruIKtt5P5nHgd02yvgJpLyPBPbvOoX/exec"; 
+
+    // ステータスを定期的に確認する関数（ポーリング）
+    function startPollingStatus(jobId) {
+      const pollingTimer = setInterval(() => {
+        fetch(gasUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'checkStatus', jobId: jobId })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'done') {
+            clearInterval(pollingTimer); // 確認ループを終了
+            
+            document.getElementById('status').innerText = "✅ 解析完了！ドキュメントとPDFを作成しました。";
+            
+            const formattedText = data.text.replace(/\n/g, '<br>');
+            const buttonsHtml = `
+              <div class="btn-container">
+                <a href="${data.docUrl}" target="_blank" class="doc-btn">📄 ドキュメントを開く</a>
+                <a href="${data.pdfUrl}" target="_blank" class="pdf-btn">📕 PDFを開く</a>
+              </div>
+              <hr>
+            `;
+            document.getElementById('result').innerHTML = buttonsHtml + formattedText;
+
+          } else if (data.status === 'error') {
+            clearInterval(pollingTimer); // 確認ループを終了
+            document.getElementById('status').innerText = "❌ 解析中にエラーが発生しました。";
+            document.getElementById('result').innerHTML = `<p style="color:red;">${data.error}</p>`;
+          }
+          // status が 'processing' の場合は、次回(10秒後)の確認を待つ
+        })
+        .catch(err => console.error("ステータス確認エラー:", err));
+      }, 10000); // 10秒ごとに確認
+    }
+
 
     document.getElementById('startBtn').addEventListener('click', async () => {
       try {
@@ -103,13 +141,10 @@
           reader.onloadend = () => {
             const base64Data = reader.result;
             
-            // ★GASのウェブアプリURLをここに設定してください★
-            const gasUrl = "https://script.google.com/macros/s/AKfycbyi6zq9LrstzjDYwkOMHpZoopXDdZMAPOhKtHruIKtt5P5nHgd02yvgJpLyPBPbvOoX/exec"; 
-            
             const payload = { 
               base64Data: base64Data, 
               mimeType: mimeType || 'audio/mp4',
-              mode: selectedMode // 選択されたモードをGASに送る
+              mode: selectedMode
             };
 
             fetch(gasUrl, {
@@ -121,6 +156,7 @@
             .then(data => {
               if (data.success) {
                 if (selectedMode === 'short') {
+                  // 短時間モード：即座に完了
                   document.getElementById('status').innerText = "✅ 解析完了！ドキュメントとPDFを作成しました。";
                   const formattedText = data.text.replace(/\n/g, '<br>');
                   const buttonsHtml = `
@@ -131,11 +167,16 @@
                     <hr>
                   `;
                   document.getElementById('result').innerHTML = buttonsHtml + formattedText;
+
                 } else {
-                  document.getElementById('status').innerText = "✅ 受付完了！";
+                  // 長時間モード：受付完了後、ステータス確認ループを開始
+                  document.getElementById('status').innerText = "⏳ サーバーで解析中...（この画面を開いたままお待ちください。数分かかる場合があります）";
                   document.getElementById('result').innerHTML = `
                     <p><strong>${data.text.replace(/\n/g, '<br>')}</strong></p>
                   `;
+                  
+                  // ジョブIDを使って定期確認を開始
+                  startPollingStatus(data.jobId);
                 }
               } else {
                 document.getElementById('status').innerText = "GAS側エラー: " + data.error;
